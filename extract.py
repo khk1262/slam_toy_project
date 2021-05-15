@@ -1,12 +1,35 @@
 import cv2
 import numpy as np
+np.set_printoptions(suppress=True)
+
 from skimage.measure import ransac
 from skimage.transform import EssentialMatrixTransform
 from skimage.transform import FundamentalMatrixTransform
 
+
 # make homogeneous matrix
 def add_ones(x):
     return np.concatenate([x, np.ones((x.shape[0], 1))], axis=1)
+
+def extractRt(E):
+    W=np.mat([[0,-1,0],[1,0,0],[0,0,1]],dtype=float)
+    U, d, Vt  = np.linalg.svd(E)
+
+    assert np.linalg.det(U) > 0
+    # if np.linalg.det(u) < 0:
+    #     u *= -1.0
+    if np.linalg.det(Vt) < 0:
+        Vt *= -1.0 
+
+    R = np.dot(np.dot(U, W), Vt)
+    if np.sum(R.diagonal()) < 0:
+        R = np.dot(np.dot(U, W.T), Vt)
+    
+    t = U[:, 2]
+    Rt = np.concatenate([R, t.reshape(3,1)], axis=1)
+    print(Rt)
+    return Rt
+
 
 class FeaturExtractor(object):
 
@@ -19,6 +42,7 @@ class FeaturExtractor(object):
 
     def normalize(self, pts):
         return np.dot(self.Kinv, add_ones(pts).T).T[:, 0:2]
+
 
 
     def denormalize(self, pt):
@@ -51,38 +75,34 @@ class FeaturExtractor(object):
                     kp1 = kps[m.queryIdx].pt
                     kp2 = self.last['kps'][m.trainIdx].pt
                     ret.append((kp1, kp2))
-
+        
+        #filter
+        Rt = None
 
         if len(ret)>0:
             ret = np.array(ret)
-            print(ret.shape)
             # normalize coords : dot product with Kinv
             # 정규화를 하기 위해서 화면의 중점으로 좌표를 이동
             ret[:, 0, :] = self.normalize(ret[:, 0, :])
             ret[:, 1, :] = self.normalize(ret[:, 1, :])
 
-            # ret[:, : , 0] -= img.shape[0] // 2
-            # ret[:, : , 1] -= img.shape[1] // 2
-
-
-            #filter
             #estimate the epipolar geometry between the prev and cur image.
             # FundamentalMatrix는 보정되지 않은(캘리브레이션 x) 이미지의 페어 사이의 점 대응에 관한 것
             model, inliers = ransac((ret[:, 0], ret[:, 1]),
-                                    # EssentialMatrixTransform,
-                                    FundamentalMatrixTransform,
+                                    EssentialMatrixTransform,
+                                    # FundamentalMatrixTransform,
                                     min_samples=8,
-                                    residual_threshold=1, max_trials=50)
+                                    # residual_threshold=1,
+                                    residual_threshold=0.005, 
+                                    max_trials=200)
             
 
             # 노이즈를 제거한다. 여기서 노이즈는 이전 프레임과 현재 프레임 사이의 연관이 확실히 있지 않는 것들
             ret = ret[inliers]
 
             # question1, why do svd compose? and why choose sqrt(2)
-            # U, sigma, V_T  = np.linalg.svd(model.params)
-            # print(sigma)
-
+            Rt = extractRt(model.params)
 
         #return
         self.last = {'kps' : kps, 'des': des}
-        return ret
+        return ret, Rt

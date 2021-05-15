@@ -6,7 +6,7 @@ import numpy as np
 
 W = 1920 // 2
 H = 1080 // 2
-F = 1
+F = 270
 # intrinsic parameters
 # u0, v0는 화면의 중앙을 뜻함
 
@@ -20,7 +20,9 @@ fe = FeaturExtractor(K)
 
 def process_frame(img):
     img = cv2.resize(img, (W, H))
-    matches = fe.extract(img)
+    matches, pose = fe.extract(img)
+    if pose is None:
+        return
 
     # denormalize for display
     # 정규 좌표계로 이동한 포인트들을 다시 화면에 맞춤
