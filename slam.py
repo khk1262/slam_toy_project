@@ -57,7 +57,8 @@ def process_frame(img):
     cv2.waitKey(1)
 
 if __name__ == "__main__":
-    cap  = cv2.VideoCapture("videos/test.mp4")
+    # cap  = cv2.VideoCapture("videos/test.mp4")
+    cap  = cv2.VideoCapture(4)
 
     while cap.isOpened():
         ret, frame = cap.read()
