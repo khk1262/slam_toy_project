@@ -7,10 +7,14 @@ from skimage.transform import EssentialMatrixTransform
 from skimage.transform import FundamentalMatrixTransform
 
 
+IRt = np.eye(4)
+
+
 # make homogeneous matrix
 def add_ones(x):
     return np.concatenate([x, np.ones((x.shape[0], 1))], axis=1)
 
+#pose
 def extractRt(E):
     W=np.mat([[0,-1,0],[1,0,0],[0,0,1]],dtype=float)
     U, d, Vt  = np.linalg.svd(E)
@@ -26,9 +30,10 @@ def extractRt(E):
         R = np.dot(np.dot(U, W.T), Vt)
     
     t = U[:, 2]
-    Rt = np.concatenate([R, t.reshape(3,1)], axis=1)
-    print(Rt)
-    return Rt
+    ret = np.eye(4)
+    ret[:3, :3] = R
+    ret[:3, 3] = t
+    return ret
 
 #특징 검출
 def extract(img):
@@ -55,7 +60,7 @@ def denormalize(K, pt):
     return int(round(ret[0])), int(round(ret[1]))
 
 
-def match(f1, f2):
+def match_frames(f1, f2):
     bf = cv2.BFMatcher(cv2.NORM_HAMMING)
 
     # bf.match(queryImage_des, trainImage_des), train에서 query를 찾아낸다.즉 querImage의 des와 가장 유사도가 높은 trainImage의 기술자를 찾음
@@ -105,3 +110,4 @@ class Frame(object):
         self.Kinv = np.linalg.inv(self.K)
         self.pts, self.des = extract(img)
         self.pts = normalize(self.Kinv, self.pts)
+        self.pose = IRt

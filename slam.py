@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import cv2
-from frame import Frame, denormalize, match
+from frame import Frame, denormalize, match_frames, IRt
 import numpy as np
 import g2o
 
@@ -23,10 +23,30 @@ def process_frame(img):
     if len(frames) <= 1:
         return 
 
-    ret, Rt = match(frames[-1], frames[-2])
+    pts, Rt = match_frames(frames[-1], frames[-2])
+
+    # 삼각측량
+    # triangulatePoints(첫번째 카메라의 3X4 투영 행렬, 두번째 카메라의 3X4 투영 행렬, 첫번째 이미지의 특징점, 두번째 이미지의 특징점)
+    # 반환되는 내용은 homogeneous 좌표에서 재구성된 4XN 배열
+    pts4d = cv2.triangulatePoints(IRt[:3], Rt[:3], pts[:, 0].T, pts[:, 1].T).T
+    frames[-1].pose = np.dot(Rt, frames[-2].pose)
+
+    # reject pts without enough "parallax"
+    good_pts4d = np.abs(pts4d[:, 3]) > 0.001
+    pts4d = pts4d[good_pts4d]
+    # print(sum(good_pts4d), len(good_pts4d))
+
+    # homogenous 3-D coords
+    pts4d /= pts4d[:, 3:]
+
+    # reject pts behind camera
+    good_pts4d= pts4d[:, 2] > 0
+    pts4d = pts4d[good_pts4d]
+
+    # print(pts4d)
     # denormalize for display
     # 정규화한 포인트들을 다시 화면에 맞춤
-    for pt1, pt2 in ret:
+    for pt1, pt2 in pts:
         u1, v1 = denormalize(K, pt1)
         u2, v2 = denormalize(K, pt2)
 
