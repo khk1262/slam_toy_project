@@ -66,11 +66,15 @@ def match_frames(f1, f2):
     # bf.match(queryImage_des, trainImage_des), train에서 query를 찾아낸다.즉 querImage의 des와 가장 유사도가 높은 trainImage의 기술자를 찾음
     matches = bf.knnMatch(f1.des, f2.des, k=2)
 
-    print(len(matches))
     ret = []
+    idx1, idx2 = [], []
+
     # Lowe's ratio test
     for m,n in matches:
         if m.distance < 0.75*n.distance:
+            idx1.append(m.queryIdx)
+            idx2.append(m.trainIdx)
+
             p1 = f1.pts[m.queryIdx]
             p2 = f2.pts[m.trainIdx]
             ret.append((p1, p2))
@@ -78,6 +82,8 @@ def match_frames(f1, f2):
     # 8인 이유는 8 points algorithmn 때문에
     assert len(ret) >= 8
     ret = np.array(ret)
+    idx1 = np.array(idx1)
+    idx2 = np.array(idx2)
 
     #filter
     #estimate the epipolar geometry between the prev and cur image.
@@ -94,14 +100,15 @@ def match_frames(f1, f2):
 
     # 노이즈를 제거한다. 여기서 노이즈는 이전 프레임과 현재 프레임 사이의 연관이 확실히 있지 않는 것들
     # 아웃라이어 제거
-    ret = ret[inliers]
+    # ret = ret[inliers]
 
     # question1, why do svd compose? and why choose sqrt(2)
     Rt = extractRt(model.params)
 
     #return
-    return ret, Rt
-
+    # return ret, Rt
+    return idx1[inliers], idx2[inliers], Rt
+ 
 
 class Frame(object):
 
