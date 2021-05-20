@@ -102,7 +102,6 @@ def match_frames(f1, f2):
     # 아웃라이어 제거
     # ret = ret[inliers]
 
-    # question1, why do svd compose? and why choose sqrt(2)
     Rt = extractRt(model.params)
 
     #return
@@ -112,9 +111,11 @@ def match_frames(f1, f2):
 
 class Frame(object):
 
-    def __init__(self, img, K):
+    def __init__(self, mapp, img, K):
         self.K = K
         self.Kinv = np.linalg.inv(self.K)
         self.pts, self.des = extract(img)
         self.pts = normalize(self.Kinv, self.pts)
         self.pose = IRt
+        self.id = len(mapp.frames)
+        mapp.frames.append(self)
