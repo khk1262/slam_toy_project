@@ -7,7 +7,7 @@ import g2o
 import OpenGL.GL as gl
 import pangolin
 
-# from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue
 
 # intrinsic parameters
 W = 1920 // 2
@@ -30,10 +30,19 @@ class Map(object):
     def __init__(self):
         self.frames = []
         self.points = []
-        # self.q = Queue()
+        self.state = None
+        self.q = Queue()
 
-        # create viewer process
+        p = Process(target=self.viewer_thread, args=(self.q, ))
+        p.daemon = True
+        p.start()
+
+
+    def viewer_thread(self, q):
         self.viewer_init()
+        while 1:
+            self.viewer_refresh(q)
+
     def viewer_init(self):
         pangolin.CreateWindowAndBind('Main', 640, 480)
         gl.glEnable(gl.GL_DEPTH_TEST)
@@ -49,12 +58,14 @@ class Map(object):
         self.dcam.SetBounds(0.0, 1.0, 0.0, 1.0, -640.0/480.0)
         self.dcam.SetHandler(handler)
 
-    def viewer_refresh(self):
+    def viewer_refresh(self, q):
+        if self.state is None or not q.empty():
+            self.state = q.get()
         ppts = np.array([d[:3, 3] for d in self.state[0]])
         spts = np.array(self.state[1])
 
-        print(ppts.shape)
-        print(spts.shape)
+        # print(ppts.shape)
+        # print(spts.shape)
         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
         gl.glClearColor(1.0, 1.0, 1.0, 1.0)
         self.dcam.Activate(self.scam)
@@ -77,8 +88,8 @@ class Map(object):
             poses.append(f.pose)
         for p in self.points:
             pts.append(p.pt)
-        self.state = poses, pts
-        self.viewer_refresh()
+        self.q.put((poses, pts))
+
 mapp = Map()
 
 
