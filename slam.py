@@ -47,23 +47,25 @@ def process_frame(img):
     # triangulatePoints(첫번째 카메라의 3X4 투영 행렬, 두번째 카메라의 3X4 투영 행렬, 첫번째 이미지의 특징점, 두번째 이미지의 특징점)
     # 반환되는 내용은 homogeneous 좌표에서 재구성된 4XN 배열
     frames[-1].pose = np.dot(Rt, frames[-2].pose)
-    # homogenous 3-D coords
 
     pts4d = triangulate(frames[-1].pose, frames[-2].pose, frames[-1].pts[idx1], frames[-2].pts[idx2])
+    print(pts4d)
+    # homogenous 좌표계의 w를 나누는 것?
+    # homogenous 3-D coords
     pts4d /= pts4d[:, 3:]
 
     # reject pts without enough "parallax"
     # reject pts behind camera
 
-    good_pts4d = (np.abs(pts4d[:, 3]) > 0.001) & (pts4d[:, 2] > 0)
+    good_pts4d = (np.abs(pts4d[:, 3]) > 0.005) & (pts4d[:, 2] > 0)
     pts4d = pts4d[good_pts4d]
 
     for i, p in enumerate(pts4d):
         if not good_pts4d[i]:
             continue
         pt = Point(p)
-        pt.add_observation(frames[-1], idx1)
-        pt.add_observation(frames[-2], idx2)
+        pt.add_observation(frames[-1], idx1[i])
+        pt.add_observation(frames[-2], idx2[i])
         
     # denormalize for display
     # 정규화한 포인트들을 다시 화면에 맞춤
@@ -72,14 +74,14 @@ def process_frame(img):
         u2, v2 = denormalize(K, pt2)
 
         cv2.circle(img, (u1, v1), color=(0,255,0), radius=3)
-        cv2.line(img, (u1, v1), (u2, v2),color=(255,255,0))
+        cv2.line(img, (u1, v1), (u2, v2),color=(255,0,0))
 
     cv2.imshow("image", img)
     cv2.waitKey(1)
 
 if __name__ == "__main__":
-    # cap  = cv2.VideoCapture("videos/test.mp4")
-    cap  = cv2.VideoCapture(4)
+    cap  = cv2.VideoCapture("videos/test.mp4")
+    # cap  = cv2.VideoCapture(4)
 
     while cap.isOpened():
         ret, frame = cap.read()

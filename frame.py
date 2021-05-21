@@ -20,8 +20,7 @@ def extractRt(E):
     U, d, Vt  = np.linalg.svd(E)
 
     assert np.linalg.det(U) > 0
-    # if np.linalg.det(u) < 0:
-    #     u *= -1.0
+
     if np.linalg.det(Vt) < 0:
         Vt *= -1.0 
 
