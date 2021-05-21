@@ -4,6 +4,10 @@ import cv2
 from frame import Frame, denormalize, match_frames, IRt
 import numpy as np
 import g2o
+import OpenGL.GL as gl
+import pangolin
+
+# from multiprocessing import Process, Queue
 
 # intrinsic parameters
 W = 1920 // 2
@@ -26,12 +30,55 @@ class Map(object):
     def __init__(self):
         self.frames = []
         self.points = []
-    def display(self):
-        for f in self.frames:
-            print(f.id)
-            print(f.pose)
-            print()
+        # self.q = Queue()
 
+        # create viewer process
+        self.viewer_init()
+    def viewer_init(self):
+        pangolin.CreateWindowAndBind('Main', 640, 480)
+        gl.glEnable(gl.GL_DEPTH_TEST)
+
+        # Define Projection and initial ModelView matrix
+        self.scam = pangolin.OpenGlRenderState(
+            pangolin.ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.2, 100),
+            pangolin.ModelViewLookAt(-2, 2, -2, 0, 0, 0, pangolin.AxisDirection.AxisY))
+        handler = pangolin.Handler3D(self.scam)
+
+        # Create Interactive View in window
+        self.dcam = pangolin.CreateDisplay()
+        self.dcam.SetBounds(0.0, 1.0, 0.0, 1.0, -640.0/480.0)
+        self.dcam.SetHandler(handler)
+
+    def viewer_refresh(self):
+        ppts = np.array([d[:3, 3] for d in self.state[0]])
+        spts = np.array(self.state[1])
+
+        print(ppts.shape)
+        print(spts.shape)
+        gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
+        gl.glClearColor(1.0, 1.0, 1.0, 1.0)
+        self.dcam.Activate(self.scam)
+
+
+        gl.glPointSize(10)
+        gl.glColor3f(0.0, 1.0, 0.0)
+        pangolin.DrawPoints(ppts)
+
+        gl.glPointSize(2)
+        gl.glColor3f(0.0, 1.0, 0.0)
+        pangolin.DrawPoints(spts)
+
+        pangolin.FinishFrame()
+
+
+    def display(self):
+        poses, pts = [], []
+        for f in self.frames:
+            poses.append(f.pose)
+        for p in self.points:
+            pts.append(p.pt)
+        self.state = poses, pts
+        self.viewer_refresh()
 mapp = Map()
 
 
@@ -40,7 +87,7 @@ class Point(object):
     # Each Point is observed in multiple frames
     def __init__(self, mapp, loc):
         self.frames = []
-        self.xyz = loc
+        self.pt = loc
         self.idxs= []
         self.id = len(mapp.frames)
         mapp.points.append(self)
@@ -84,6 +131,7 @@ def process_frame(img):
     for i, p in enumerate(pts4d):
         if not good_pts4d[i]:
             continue
+
         pt = Point(mapp, p)
         pt.add_observation(f1, idx1)
         pt.add_observation(f2, idx2)
