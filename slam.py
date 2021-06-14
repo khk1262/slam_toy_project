@@ -15,12 +15,12 @@ H = 1080 // 2
 F = 270
 
 K = np.array(([F, 0, W//2], [0,F,H//2], [0, 0, 1]))
-
+Kinv = np.linalg.inv(K)
 # intrinsic parameter
 # W = 640
 # H = 480
 
-# K = np.array(([618.035, 0, 301.457], [0,619.002,234.492], [0, 0, 1]))
+# K = np.array(([632.950, 0, 326.063], [0,632.211,224.883], [0, 0, 1]))
 
 cv2.namedWindow("image", cv2.WINDOW_NORMAL)
 
@@ -39,45 +39,50 @@ class Map(object):
 
 
     def viewer_thread(self, q):
-        self.viewer_init()
+        self.viewer_init(1024, 768)
         while 1:
             self.viewer_refresh(q)
 
-    def viewer_init(self):
-        pangolin.CreateWindowAndBind('Main', 640, 480)
+    def viewer_init(self, w, h):
+        pangolin.CreateWindowAndBind('Main', w, h)
         gl.glEnable(gl.GL_DEPTH_TEST)
 
         # Define Projection and initial ModelView matrix
         self.scam = pangolin.OpenGlRenderState(
-            pangolin.ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.2, 100),
-            pangolin.ModelViewLookAt(-2, 2, -2, 0, 0, 0, pangolin.AxisDirection.AxisY))
+            pangolin.ProjectionMatrix(640, 480, 420, 420, w//2, h//2, 0.2, 100),
+            pangolin.ModelViewLookAt(0, -10, -8, 
+                                     0, 0, 0,
+                                     0, -1, 0))
         handler = pangolin.Handler3D(self.scam)
 
         # Create Interactive View in window
         self.dcam = pangolin.CreateDisplay()
-        self.dcam.SetBounds(0.0, 1.0, 0.0, 1.0, -640.0/480.0)
+        self.dcam.SetBounds(0.0, 1.0, 0.0, 1.0, -w/h)
         self.dcam.SetHandler(handler)
 
     def viewer_refresh(self, q):
         if self.state is None or not q.empty():
             self.state = q.get()
-        ppts = np.array([d[:3, 3] for d in self.state[0]])
-        spts = np.array(self.state[1])
 
-        # print(ppts.shape)
-        # print(spts.shape)
+
         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
         gl.glClearColor(1.0, 1.0, 1.0, 1.0)
         self.dcam.Activate(self.scam)
 
 
-        gl.glPointSize(10)
-        gl.glColor3f(0.0, 1.0, 0.0)
-        pangolin.DrawPoints(ppts)
+        # gl.glColor3f(0.0, 1.0, 0.0)
+        # for pose in self.state[0]:
+        #     pangolin.glDrawFrustrum(Kinv, 2, 2, pose, 1)
 
-        gl.glPointSize(2)
+        # draw poses
         gl.glColor3f(0.0, 1.0, 0.0)
-        pangolin.DrawPoints(spts)
+        pangolin.DrawCameras(self.state[0])
+
+
+        # draw keypoints
+        gl.glPointSize(2)
+        gl.glColor3f(1.0, 0.0, 0.0)
+        pangolin.DrawPoints(self.state[1])
 
         pangolin.FinishFrame()
 
@@ -86,9 +91,11 @@ class Map(object):
         poses, pts = [], []
         for f in self.frames:
             poses.append(f.pose)
+            #print(f.pose)
+
         for p in self.points:
             pts.append(p.pt)
-        self.q.put((poses, pts))
+        self.q.put((np.array(poses), np.array(pts)))
 
 mapp = Map()
 
@@ -163,7 +170,7 @@ def process_frame(img):
 
 if __name__ == "__main__":
     cap  = cv2.VideoCapture("videos/test.mp4")
-    # cap  = cv2.VideoCapture(4)
+    # cap  = cv2.VideoCapture(0)
 
     while cap.isOpened():
         ret, frame = cap.read()
