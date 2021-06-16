@@ -79,7 +79,6 @@ def match_frames(f1, f2):
             p2 = f2.pts[m.trainIdx]
             ret.append((p1, p2))
     
-    # 8인 이유는 8 points algorithmn 때문에
     assert len(ret) >= 8
     ret = np.array(ret)
     idx1 = np.array(idx1)
